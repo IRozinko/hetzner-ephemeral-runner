@@ -26,6 +26,7 @@ GITHUB_API="https://api.github.com"
 SERVER_ID=""
 FIREWALL_ID=""
 RUN_ID=""
+RUNNER_TOKEN=""
 
 log() {
   printf '[%s] %s\n' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" "$*"
@@ -118,6 +119,19 @@ validate_inputs() {
   [[ "$TARGET_REPO" == */* ]] || fail "TARGET_REPO must be in owner/repo format"
 }
 
+preflight_github() {
+  log "Preflight: validating GitHub token and runner permissions"
+  RUNNER_TOKEN=$(github POST "/repos/${RUNNER_REPO}/actions/runners/registration-token" | jq -r '.token')
+  [[ -n "$RUNNER_TOKEN" && "$RUNNER_TOKEN" != "null" ]] || fail "Failed to create runner registration token"
+  log "Preflight: GitHub runner registration token created successfully"
+}
+
+preflight_hetzner() {
+  log "Preflight: validating Hetzner token"
+  hcloud GET /locations >/dev/null
+  log "Preflight: Hetzner API access works"
+}
+
 create_firewall() {
   log "Creating firewall with no inbound rules"
 
@@ -135,11 +149,6 @@ create_firewall() {
   [[ -n "$FIREWALL_ID" && "$FIREWALL_ID" != "null" ]] || fail "Failed to create firewall"
 
   log "Firewall created: ${FIREWALL_ID}"
-}
-
-create_runner_registration_token() {
-  log "Creating GitHub Actions runner registration token"
-  github POST "/repos/${RUNNER_REPO}/actions/runners/registration-token" | jq -r '.token'
 }
 
 build_cloud_init() {
@@ -298,11 +307,10 @@ wait_for_workflow_completion() {
 
 main() {
   validate_inputs
+  preflight_github
+  preflight_hetzner
   create_firewall
-  local runner_token
-  runner_token=$(create_runner_registration_token)
-  [[ -n "$runner_token" && "$runner_token" != "null" ]] || fail "Failed to create runner registration token"
-  create_server "$runner_token"
+  create_server "$RUNNER_TOKEN"
   wait_for_runner_online
   dispatch_workflow
   wait_for_workflow_run
