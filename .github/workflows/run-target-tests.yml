@@ -1,0 +1,56 @@
+name: Run Target Repository Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      runner_label:
+        description: "Temporary self-hosted runner label"
+        required: true
+        type: string
+      target_repo:
+        description: "Repository to test in owner/repo format"
+        required: true
+        default: "IRozinko/self-improvement"
+        type: string
+      target_ref:
+        description: "Branch, tag, or commit SHA to test"
+        required: true
+        default: "main"
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  TARGET_REPO: ${{ inputs.target_repo }}
+  TARGET_REF: ${{ inputs.target_ref }}
+
+jobs:
+  target-tests:
+    name: Run tests on ephemeral Hetzner runner
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
+      - ${{ inputs.runner_label }}
+
+    steps:
+      - name: Checkout runner repository
+        uses: actions/checkout@v4
+
+      - name: Checkout target repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.target_repo }}
+          ref: ${{ inputs.target_ref }}
+          path: target-repository
+
+      - name: Show environment
+        run: |
+          uname -a
+          node --version || true
+          npm --version || true
+          git --version
+
+      - name: Run target repository checks
+        run: ./scripts/test-target-repo.sh target-repository
