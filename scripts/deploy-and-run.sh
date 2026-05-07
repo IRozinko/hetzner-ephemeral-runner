@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+if [[ -f .env ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source .env
+  set +a
+fi
+
 RUNNER_REPO="${RUNNER_REPO:-IRozinko/hetzner-ephemeral-runner}"
 TARGET_REPO="${TARGET_REPO:-IRozinko/self-improvement}"
 TARGET_REF="${TARGET_REF:-main}"
